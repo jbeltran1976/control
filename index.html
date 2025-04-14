@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Registro de Consumos</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    /* Estilos básicos para una interfaz limpia y atractiva */
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f4f4f4;
+    }
+    header {
+      background: #005A9C;
+      color: #fff;
+      padding: 1em;
+      text-align: center;
+    }
+    main {
+      max-width: 800px;
+      margin: 20px auto;
+      background: #fff;
+      padding: 20px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    .producto-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #ddd;
+      padding: 10px 0;
+    }
+    .producto-info {
+      flex: 1;
+    }
+    .producto-nombre {
+      font-size: 1.2em;
+      margin: 0;
+    }
+    .producto-categoria {
+      color: #777;
+      margin: 5px 0;
+    }
+    .controls {
+      display: flex;
+      align-items: center;
+    }
+    .controls button {
+      width: 30px;
+      height: 30px;
+      margin: 0 5px;
+      border: none;
+      background: #005A9C;
+      color: #fff;
+      font-size: 1.2em;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    .counter {
+      min-width: 20px;
+      text-align: center;
+    }
+    .agregar-producto {
+      margin: 20px 0;
+      text-align: center;
+    }
+    .agregar-producto button {
+      padding: 10px 20px;
+      border: none;
+      background: #28a745;
+      color: #fff;
+      font-size: 1em;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+    /* Estilos para el modal */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.5);
+    }
+    .modal-content {
+      background: #fff;
+      margin: 10% auto;
+      padding: 20px;
+      border: 1px solid #888;
+      width: 80%;
+      max-width: 400px;
+      border-radius: 5px;
+    }
+    .close {
+      float: right;
+      cursor: pointer;
+      font-size: 1.5em;
+    }
+    label {
+      display: block;
+      margin: 10px 0 5px;
+    }
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+    }
+    input[type="submit"] {
+      margin-top: 15px;
+      padding: 10px;
+      width: 100%;
+      border: none;
+      background: #005A9C;
+      color: #fff;
+      font-size: 1em;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    #session-summary {
+      margin-top: 30px;
+    }
+    #session-summary table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    #session-summary th, #session-summary td {
+      border: 1px solid #ccc;
+      text-align: center;
+      padding: 8px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Registro de Consumos</h1>
+  </header>
+  <main>
+    <!-- Lista del catálogo -->
+    <section id="catalogo-lista">
+      <!-- Se generarán las tarjetas de producto aquí -->
+    </section>
+
+    <div class="agregar-producto">
+      <button id="btnAbrirModal">Agregar producto</button>
+    </div>
+
+    <!-- Resumen de la sesión -->
+    <section id="session-summary">
+      <h2>Resumen de la sesión</h2>
+      <div id="resumen"></div>
+    </section>
+  </main>
+
+  <!-- Modal para agregar nuevo producto -->
+  <div id="modalProducto" class="modal">
+    <div class="modal-content">
+      <span class="close" id="cerrarModal">&times;</span>
+      <h2>Agregar nuevo producto</h2>
+      <form id="formProducto">
+        <label for="nombre">Nombre</label>
+        <input type="text" id="nombre" name="nombre" required>
+        
+        <label for="categoria">Categoría</label>
+        <input type="text" id="categoria" name="categoria" required>
+        
+        <label for="precioSugerido">Precio sugerido (opcional)</label>
+        <input type="number" step="0.01" id="precioSugerido" name="precioSugerido">
+        
+        <!-- Imagen opcional: URL o ruta de la imagen -->
+        <label for="imagen">Imagen (opcional - URL)</label>
+        <input type="text" id="imagen" name="imagen">
+        
+        <input type="submit" value="Agregar producto">
+      </form>
+    </div>
+  </div>
+
+  <script>
+    /* Constantes para las claves de localStorage */
+    const STORAGE_CATALOGO = 'catalogo';
+    const STORAGE_SESIONES = 'sesiones';
+    // Generamos un id de sesión basado en la fecha (para simplificar)
+    const idSesionActual = 'sess_' + new Date().toISOString();
+
+    // Funciones de manejo de localStorage
+    function obtenerCatalogo() {
+      const catalogoJSON = localStorage.getItem(STORAGE_CATALOGO);
+      return catalogoJSON ? JSON.parse(catalogoJSON) : [];
+    }
+    function guardarCatalogo(catalogo) {
+      localStorage.setItem(STORAGE_CATALOGO, JSON.stringify(catalogo));
+    }
+    function obtenerSesiones() {
+      const sesionesJSON = localStorage.getItem(STORAGE_SESIONES);
+      return sesionesJSON ? JSON.parse(sesionesJSON) : [];
+    }
+    function guardarSesiones(sesiones) {
+      localStorage.setItem(STORAGE_SESIONES, JSON.stringify(sesiones));
+    }
+
+    // Inicializa el catálogo con algunos productos predeterminados si está vacío.
+    function inicializarCatalogo() {
+      let catalogo = obtenerCatalogo();
+      if (catalogo.length === 0) {
+        catalogo = [
+
+        ];
+        guardarCatalogo(catalogo);
+      }
+    }
+
+    // Función para registrar (o actualizar) el consumo en la sesión actual
+    function registrarConsumo(idProducto, incremento = 1) {
+      let sesiones = obtenerSesiones();
+      let sesion = sesiones.find(s => s.id === idSesionActual);
+      if (!sesion) {
+        sesion = { id: idSesionActual, fecha: new Date().toISOString(), consumos: [] };
+        sesiones.push(sesion);
+      }
+      let consumo = sesion.consumos.find(c => c.idProducto === idProducto);
+      if (!consumo) {
+        consumo = { idProducto, cantidad: 0 };
+        sesion.consumos.push(consumo);
+      }
+      consumo.cantidad = Math.max(0, consumo.cantidad + incremento);
+      guardarSesiones(sesiones);
+      actualizarResumen();
+    }
+
+    // Renderiza la lista de productos (catálogo)
+    function renderCatalogo() {
+      const catalogo = obtenerCatalogo();
+      const lista = document.getElementById('catalogo-lista');
+      lista.innerHTML = ''; // Limpiar contenido previo
+
+      catalogo.forEach(producto => {
+        // Crear tarjeta para cada producto
+        const productoCard = document.createElement('div');
+        productoCard.className = 'producto-card';
+
+        // Información del producto
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'producto-info';
+        const nombreElem = document.createElement('p');
+        nombreElem.className = 'producto-nombre';
+        nombreElem.textContent = producto.nombre;
+        const categoriaElem = document.createElement('p');
+        categoriaElem.className = 'producto-categoria';
+        categoriaElem.textContent = producto.categoria;
+        infoDiv.appendChild(nombreElem);
+        infoDiv.appendChild(categoriaElem);
+
+        // Controles: botones "-" y "+" con contador
+        const controlsDiv = document.createElement('div');
+        controlsDiv.className = 'controls';
+        const btnMinus = document.createElement('button');
+        btnMinus.textContent = '-';
+        btnMinus.addEventListener('click', () => {
+          registrarConsumo(producto.id, -1);
+          actualizarContador(producto.id);
+        });
+        const contadorSpan = document.createElement('span');
+        contadorSpan.className = 'counter';
+        contadorSpan.id = 'contador_' + producto.id;
+        contadorSpan.textContent = obtenerCantidadProductoSesion(producto.id);
+        const btnPlus = document.createElement('button');
+        btnPlus.textContent = '+';
+        btnPlus.addEventListener('click', () => {
+          registrarConsumo(producto.id, 1);
+          actualizarContador(producto.id);
+        });
+
+        controlsDiv.appendChild(btnMinus);
+        controlsDiv.appendChild(contadorSpan);
+        controlsDiv.appendChild(btnPlus);
+
+        productoCard.appendChild(infoDiv);
+        productoCard.appendChild(controlsDiv);
+        lista.appendChild(productoCard);
+      });
+    }
+
+    // Obtiene la cantidad consumida de un producto en la sesión actual
+    function obtenerCantidadProductoSesion(idProducto) {
+      const sesiones = obtenerSesiones();
+      const sesion = sesiones.find(s => s.id === idSesionActual);
+      if (!sesion) return 0;
+      const consumo = sesion.consumos.find(c => c.idProducto === idProducto);
+      return consumo ? consumo.cantidad : 0;
+    }
+
+    // Actualiza el contador mostrado en la UI para un producto dado
+    function actualizarContador(idProducto) {
+      const contador = document.getElementById('contador_' + idProducto);
+      if (contador) {
+        contador.textContent = obtenerCantidadProductoSesion(idProducto);
+      }
+    }
+
+    // Actualiza el resumen (tabla) de consumos de la sesión actual
+    function actualizarResumen() {
+      const resumenDiv = document.getElementById('resumen');
+      const sesiones = obtenerSesiones();
+      const sesion = sesiones.find(s => s.id === idSesionActual);
+      if (!sesion) {
+        resumenDiv.innerHTML = '<p>No hay consumos registrados en esta sesión.</p>';
+        return;
+      }
+      let html = '<table><tr><th>Producto</th><th>Cantidad</th></tr>';
+      const catalogo = obtenerCatalogo();
+      sesion.consumos.forEach(consumo => {
+        const prod = catalogo.find(p => p.id === consumo.idProducto);
+        if (prod) {
+          html += `<tr><td>${prod.nombre}</td><td>${consumo.cantidad}</td></tr>`;
+        }
+      });
+      html += '</table>';
+      resumenDiv.innerHTML = html;
+    }
+
+    // Funciones para manejo del modal de "Agregar producto"
+    function abrirModal() {
+      document.getElementById('modalProducto').style.display = 'block';
+    }
+    function cerrarModal() {
+      document.getElementById('modalProducto').style.display = 'none';
+      document.getElementById('formProducto').reset();
+    }
+    document.getElementById('btnAbrirModal').addEventListener('click', abrirModal);
+    document.getElementById('cerrarModal').addEventListener('click', cerrarModal);
+    window.addEventListener('click', (event) => {
+      if (event.target === document.getElementById('modalProducto')) {
+        cerrarModal();
+      }
+    });
+
+    // Manejo del formulario para agregar un nuevo producto
+    document.getElementById('formProducto').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const nombre = document.getElementById('nombre').value.trim();
+      const categoria = document.getElementById('categoria').value.trim();
+      const precioSugerido = document.getElementById('precioSugerido').value.trim();
+      const imagen = document.getElementById('imagen').value.trim();
+      if (nombre && categoria) {
+        let catalogo = obtenerCatalogo();
+        // Generamos un id único basado en la longitud actual del catálogo
+        const id = (catalogo.length + 1).toString().padStart(3, '0');
+        const nuevoProducto = {
+          id,
+          nombre,
+          categoria,
+          precioSugerido: precioSugerido ? parseFloat(precioSugerido) : null,
+          imagen
+        };
+        catalogo.push(nuevoProducto);
+        guardarCatalogo(catalogo);
+        renderCatalogo();
+        cerrarModal();
+      }
+    });
+
+    // Inicialización de la aplicación
+    inicializarCatalogo();
+    renderCatalogo();
+    actualizarResumen();
+  </script>
+</body>
+</html>
